@@ -1,0 +1,13 @@
+{
+    "Omnipool": {
+        "bridgeToken": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "portal": "0x93E5f898163e2708d57a02b7532802DE31CEa708",
+        "routerV2": "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24",
+        "qpFeeToken": "0x6D34420DcAf516bEc9D81e5d79FAC2100058C9AC",
+        "lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+        "oft": "0xe6388F7c0f7ad74f5F82693EfB46C021EaE976e0",
+        "its": "0xD2b1dB268A9c03009452aD16988045DD36c8FE13",
+        "interchainTokenService": "0xB5FB4BE02232B1bBA4dC8f81dc24C26980dE9e3C",
+        "gasService": "0x2d5d7d31F671F86C782533cc367F14109a082712"
+    }
+}
