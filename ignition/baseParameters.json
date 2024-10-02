@@ -3,10 +3,10 @@
         "bridgeToken": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
         "portal": "0x93E5f898163e2708d57a02b7532802DE31CEa708",
         "routerV2": "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24",
-        "qpFeeToken": "0x6D34420DcAf516bEc9D81e5d79FAC2100058C9AC",
+        "qpFeeToken": "0x4Add1001B24A2Ee1417F02d3C18Bdad0d6fbC59e",
         "lzEndpoint": "0x1a44076050125825900e736c501f859c50fE728c",
-        "oft": "0xe6388F7c0f7ad74f5F82693EfB46C021EaE976e0",
-        "its": "0xD2b1dB268A9c03009452aD16988045DD36c8FE13",
+        "oft": "0x3ca437941Db4b4797046bc7B814fD9C80293bC6a",
+        "its": "0xcE15516130F5293F9ae507C3b1cCCD4cA2c92640",
         "interchainTokenService": "0xB5FB4BE02232B1bBA4dC8f81dc24C26980dE9e3C",
         "gasService": "0x2d5d7d31F671F86C782533cc367F14109a082712"
     }

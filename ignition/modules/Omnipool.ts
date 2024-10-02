@@ -13,7 +13,6 @@ const deployModule = buildModule("Omnipool", (m) => {
     const omnipool = m.contract(
         "Omnipool",
         [
-            m.getParameter("portal"),
             m.getParameter("lzEndpoint"),
             m.getParameter("routerV2"),
             m.getParameter("interchainTokenService"),
@@ -22,14 +21,15 @@ const deployModule = buildModule("Omnipool", (m) => {
         {id: "deploy"}
     )
     m.call(omnipool, "setBridgeToken", [usdc], {id: "setBridgeToken"})
-    m.call(omnipool, "setChainIdKeys", [[42161, 8453], [30110, 30184], ["arbitrum", "base"]], {id: "setChainIdKeys"})
+    m.call(omnipool, "setChainIdKeys", [[42161, 8453, 10, 137], [30110, 30184, 30111, 30109], ["arbitrum", "base", "optimism", "Polygon"]], {id: "setChainIdKeys"})
 
     m.call(usdc, "approve", [omnipool, ethers.MaxUint256], {id: "approveUsdc"})
-    m.call(usdc, "transfer", [omnipool, 50000n], {id: "addLiquidity"})
+    m.call(usdc, "transfer", [omnipool, 450000n], {id: "addLiquidity"})
     m.call(oft, "approve", [omnipool, ethers.MaxUint256], {id: "approveOFT"})
     m.call(its, "approve", [omnipool, ethers.MaxUint256], {id: "approveITS"})
     m.call(qpFeeToken, "transfer", [omnipool, 1000000000000000000000000n], {id: "addQpFeeToken"})
     m.call(omnipool, "receiveNative", [], {value: 200000000000000n, id: "sendNative"})
+    m.call(omnipool, "setPortal", [m.getParameter("portal")], {id: "setPortal"})
 
     return {omnipool, usdc, oft}
 })

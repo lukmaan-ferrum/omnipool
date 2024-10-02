@@ -23,6 +23,7 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
     uint256 feeFactor;
     uint256 remoteExecutionGas;
     uint256 qpFee;
+    uint256 nonce;
     address public lzEndpoint;
 
     mapping (uint256 => address) public trustedRemotes;
@@ -45,11 +46,9 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
     error ChainNotSet();
 
     event OApp(address);
-    event Fees(uint256);
-    event Logging(bytes);
-    event LoggingString(string);
-    event If();
-    event Else();
+    event OmniswapInitiated(bytes32 guid);
+    event OmniswapSwapped(bytes32 guid);
+    event OmniswapCompleted(bytes32 guid);
 
     modifier onlyPortal() {
         if (msg.sender != address(portal)) revert NotPortal();
@@ -57,13 +56,11 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
     }
 
     constructor(
-        address _portal,
         address _lzEndpoint,
         address _routerV2,
         address _interchainTokenService,
         address _gasService
     ) Ownable(tx.origin) InterchainTokenExecutable(_interchainTokenService) {
-        portal = IQuantumPortalPoc(_portal);
         routerV2 = IRouterV2(_routerV2);
         gasService = IInterchainGasService(_gasService);
         lzEndpoint = _lzEndpoint;
@@ -81,8 +78,11 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
         IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
 
         uint256 qpLeg = _determineQpLeg(path);
+        bytes32 guid = keccak256(abi.encodePacked(block.chainid, nonce));
+        nonce++;
+
         if (qpLeg == 0) {
-            bytes memory payload = abi.encodeWithSignature("swapAndTransfer(uint256,uint256,address,address)", amountIn, amountOutMin, path[1], msg.sender);
+            bytes memory payload = abi.encodeWithSignature("swapAndTransfer(uint256,uint256,address,address,bytes32)", amountIn, amountOutMin, path[1], msg.sender, guid);
             
             IERC20(portal.feeToken()).transfer(portal.feeTarget(), qpFee);
             portal.run(
@@ -92,7 +92,7 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
                 payload
             );
         } else {
-            bytes memory payload = abi.encode(amountOutMin, path[0], msg.sender);
+            bytes memory payload = abi.encode(amountOutMin, path[0], msg.sender, guid);
 
             if (_isITS(path[0])) {
                 _handleITSTransfer(amountIn, path[0], payload, remoteExecutionGas, LIQUIDITY_CHAIN_ID);
@@ -100,28 +100,40 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
                 _handleOFTTransfer(amountIn, path[0], payload, remoteExecutionGas, LIQUIDITY_CHAIN_ID);
             }
         }
+
+        emit OmniswapInitiated(guid);
     }
 
-    function release(uint256 amount, address recipient) external onlyPortal {
+    function release(uint256 amount, address recipient, bytes32 guid) external onlyPortal {
         (uint256 sourceChainId, address remoteCaller,) = portal.msgSender();
         if (trustedRemotes[sourceChainId] != remoteCaller) revert NotTrustedRemote();
         bridgeToken.transfer(recipient, amount);
+
+        emit OmniswapCompleted(guid);
     }
 
-    function swapAndTransfer(uint256 amountIn, uint256 amountOutMin, address toToken, address recipient) external onlyPortal {
+    function swapAndTransfer(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address toToken,
+        address recipient,
+        bytes32 guid
+    ) external onlyPortal {
         (uint256 sourceChainId, address remoteCaller,) = portal.msgSender();
         if (trustedRemotes[sourceChainId] != remoteCaller) revert NotTrustedRemote();
 
         uint256 amountOut = _swap(amountIn, amountOutMin, address(bridgeToken), toToken);
 
         // lz Transfer
-        bytes memory payload = abi.encode(recipient, toToken);
+        bytes memory payload = abi.encode(recipient, toToken, guid);
 
         if (_isITS(toToken)) {
             _handleITSTransfer(amountOut, toToken, payload, 60_000, sourceChainId);
         } else {
             _handleOFTTransfer(amountOut, toToken, payload, 60_000, sourceChainId);
         }
+
+        emit OmniswapSwapped(guid);
     }
 
     function lzCompose(
@@ -131,7 +143,6 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
         address /*Executor*/,
         bytes calldata /*Executor Data*/
     ) external payable {
-        emit Logging(_message);
         if (msg.sender != lzEndpoint) revert NotEndpoint();
         emit OApp(_oApp);
 
@@ -139,11 +150,12 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
         bytes memory _composeMessage = OFTComposeMsgCodec.composeMsg(_message);
         uint32 srcEid = OFTComposeMsgCodec.srcEid(_message);
 
-        if (_composeMessage.length == 0x40) {
-            (address recipient, address token) = abi.decode(_composeMessage, (address, address));
+        if (_composeMessage.length == 0x60) {
+            (address recipient, address token, bytes32 guid) = abi.decode(_composeMessage, (address, address, bytes32));
             IERC20(token).transfer(recipient, amount);
+            emit OmniswapCompleted(guid);
         } else {
-            (uint256 amountOutMin, address token, address recipient) = abi.decode(_composeMessage, (uint256, address, address));
+            (uint256 amountOutMin, address token, address recipient, bytes32 guid) = abi.decode(_composeMessage, (uint256, address, address, bytes32));
             
             uint256 srcChainId = _getChainId(srcEid);
             uint256 amountOut = _swap(amount, amountOutMin, token, address(bridgeToken));
@@ -153,8 +165,9 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
                 uint64(srcChainId),
                 trustedRemotes[srcChainId],
                 owner(),
-                abi.encodeWithSignature("release(uint256,address)", amountOut, recipient)
+                abi.encodeWithSignature("release(uint256,address,bytes32)", amountOut, recipient, guid)
             );
+            emit OmniswapSwapped(guid);
         }
     }
 
@@ -214,6 +227,10 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
         for (uint256 i = 0; i < token.length; i++) {
             IERC20(token[i]).transfer(owner(), IERC20(token[i]).balanceOf(address(this)));
         }
+    }
+
+    function setPortal(address _portal) external onlyOwner {
+        portal = IQuantumPortalPoc(_portal);
     }
 
     //#############################################################
@@ -359,13 +376,14 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
     ) internal override {
         if (trustedRemotes[_getChainId(sourceChain)] != _toAddress(sourceAddress)) revert NotTrustedRemote();
 
-        if (data.length == 0x40) {
-            (address recipient,) = abi.decode(data, (address, address));
+        if (data.length == 0x60) {
+            (address recipient,,bytes32 guid) = abi.decode(data, (address, address, bytes32));
             IERC20(token).transfer(recipient, amount);
+            emit OmniswapCompleted(guid);
         } else {
             IERC20(token).approve(address(routerV2), amount);
 
-            (uint256 amountOutMin,,address recipient) = abi.decode(data, (uint256, address, address));
+            (uint256 amountOutMin,,address recipient, bytes32 guid) = abi.decode(data, (uint256, address, address, bytes32));
             
             uint256 srcChainId = _getChainId(sourceChain);
             uint256 amountOut = _swap(amount, amountOutMin, token, address(bridgeToken));
@@ -375,8 +393,10 @@ contract Omnipool is Ownable, InterchainTokenExecutable {
                 uint64(srcChainId),
                 trustedRemotes[srcChainId],
                 owner(),
-                abi.encodeWithSignature("release(uint256,address)", amountOut, recipient)
+                abi.encodeWithSignature("release(uint256,address,bytes32)", amountOut, recipient, guid)
             );
+
+            emit OmniswapSwapped(guid);
         }
     }
 

@@ -9,11 +9,11 @@ const endpointAbi = [
 async function setLibraries() {
 
     // Replace with your actual values
-    const YOUR_OAPP_ADDRESS = '0xe6388F7c0f7ad74f5F82693EfB46C021EaE976e0';
+    const YOUR_OAPP_ADDRESS = '0x3ca437941Db4b4797046bc7B814fD9C80293bC6a';
     const YOUR_SEND_LIB_ADDRESS = '0xB5320B0B3a13cC860893E2Bd79FCd7e13484Dda2';
     const YOUR_RECEIVE_LIB_ADDRESS = '0xc70AB6f32772f59fBfc23889Caf4Ba3376C84bAf';
     const YOUR_ENDPOINT_CONTRACT_ADDRESS = '0x1a44076050125825900e736c501f859c50fE728c';
-    const remoteEid = 30110;
+    const remoteEid = 30111;
 
     const signer = await hre.ethers.provider.getSigner()
     const endpointContract = new ethers.Contract(YOUR_ENDPOINT_CONTRACT_ADDRESS, endpointAbi, signer);
